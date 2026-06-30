@@ -1,0 +1,49 @@
+name: "SCA — OSV-Scanner"
+
+on:
+  push:
+    branches: ["main", "master"]
+  pull_request:
+    branches: ["main", "master"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  security-events: write
+
+jobs:
+  osv-scan:
+    name: OSV-Scanner Dependency Check
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run OSV-Scanner on composer.lock
+        uses: google/osv-scanner-action@v1
+        with:
+          scan-args: |-
+            --lockfile=composer.lock
+            --format=sarif
+            --output=osv-results.sarif
+        continue-on-error: true
+
+      - name: Upload OSV SARIF to Code Scanning
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: osv-results.sarif
+          category: osv-sca
+
+      - name: Upload OSV results as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: osv-scan-results
+          path: osv-results.sarif
+
+      - name: Fail on CRITICAL/HIGH CVEs
+        uses: google/osv-scanner-action@v1
+        with:
+          scan-args: |-
+            --lockfile=composer.lock
+            --fail-on-vuln
